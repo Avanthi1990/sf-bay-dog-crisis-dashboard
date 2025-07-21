@@ -10,7 +10,22 @@ import json
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
+import dash
+from dash import dcc, html
+# ... your other imports
 
+# After you create your Dash app (usually something like app = dash.Dash(__name__))
+app = dash.Dash(__name__)
+
+# ADD THIS LINE - Required for deployment
+server = app.server
+
+# ... rest of your existing code (layout, callbacks, etc.)
+
+# At the bottom, update your run configuration:
+if __name__ == '__main__':
+    # For local development
+    app.run_server(debug=True)
 class RealDataSFDogMatcher:
     def __init__(self):
         """Initialize the interactive Dash application with real data"""
