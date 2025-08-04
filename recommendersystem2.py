@@ -1,17 +1,17 @@
-import dash
-from dash import dcc, html, Input, Output
+import streamlit as st
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
-import os
 
-# Create the Dash app
-app = dash.Dash(__name__)
+# Page configuration
+st.set_page_config(
+    page_title="🐕 SF Dog Crisis Dashboard",
+    page_icon="🐕",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# CRITICAL: This line exposes the server to Render
-server = app.server
-
-# Simple sample data (since CSV files aren't on Render)
+# Sample data
 sample_neighborhoods = {
     'Mission': {'safety_score': 65, 'walkability_score': 85, 'avg_rent': 3500, 'crime_count': 45},
     'Marina': {'safety_score': 88, 'walkability_score': 92, 'avg_rent': 4200, 'crime_count': 12},
@@ -28,124 +28,199 @@ sample_dogs = [
     {'name': 'Rocky', 'breed': 'Rottweiler', 'size': 'Large', 'protection_score': 92, 'monthly_cost': 135}
 ]
 
-# App layout
-app.layout = html.Div([
-    # Header
-    html.Div([
-        html.H1("🐕 SF Dog Crisis Dashboard", 
-                style={'text-align': 'center', 'color': '#2c3e50', 'margin-bottom': '10px'}),
-        html.P("Prototype version - Real data dashboard coming soon!", 
-               style={'text-align': 'center', 'color': '#7f8c8d', 'margin-bottom': '30px'})
-    ], style={'background': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', 
-              'padding': '30px', 'border-radius': '10px', 'margin-bottom': '20px'}),
+# Custom CSS for styling
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    .metric-card {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin: 10px;
+    }
+    .dog-card {
+        background: #ffffff;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin: 20px 0;
+    }
+    .stSelectbox > div > div {
+        font-size: 16px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-    # User Input
-    html.Div([
-        html.H3("Select Your Neighborhood:", style={'color': '#2c3e50', 'margin-bottom': '20px'}),
-        
-        dcc.Dropdown(
-            id='neighborhood-dropdown',
-            options=[{'label': f"📍 {neighborhood}", 'value': neighborhood} 
-                    for neighborhood in sample_neighborhoods.keys()],
-            placeholder="🏠 Select your SF neighborhood...",
-            style={'margin-bottom': '20px', 'font-size': '16px'}
-        ),
-        
-        html.Button("Find My Perfect Guardian", id='find-match-button', n_clicks=0,
-                   style={'background': '#e74c3c', 'color': 'white', 'border': 'none', 
-                         'padding': '15px 30px', 'border-radius': '25px', 'font-size': '16px',
-                         'cursor': 'pointer', 'width': '100%'})
-    ], style={'background': '#ffffff', 'padding': '25px', 'border-radius': '10px', 
-              'box-shadow': '0 4px 6px rgba(0, 0, 0, 0.1)', 'margin-bottom': '20px'}),
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1 style='color: #2c3e50; margin-bottom: 10px;'>🐕 SF Dog Crisis Dashboard</h1>
+    <p style='color: #7f8c8d; margin-bottom: 0;'>Prototype version - Real data dashboard coming soon!</p>
+</div>
+""", unsafe_allow_html=True)
 
-    # Results
-    html.Div(id='results-container')
+# Sidebar for user input
+with st.sidebar:
+    st.header("🏠 Select Your Neighborhood")
     
-], style={'max-width': '1200px', 'margin': '0 auto', 'padding': '20px', 
-          'font-family': 'Arial, sans-serif', 'background-color': '#f8f9fa'})
-
-# Callback
-@app.callback(
-    Output('results-container', 'children'),
-    [Input('find-match-button', 'n_clicks')],
-    [dash.dependencies.State('neighborhood-dropdown', 'value')]
-)
-def update_results(n_clicks, neighborhood):
-    if n_clicks == 0 or not neighborhood:
-        return html.Div([
-            html.H4("👆 Select your neighborhood above to see recommendations",
-                   style={'text-align': 'center', 'color': '#7f8c8d', 'margin': '50px'})
-        ])
+    neighborhood = st.selectbox(
+        "Choose your SF neighborhood:",
+        options=list(sample_neighborhoods.keys()),
+        index=None,
+        placeholder="Select a neighborhood..."
+    )
     
+    find_match = st.button(
+        "Find My Perfect Guardian",
+        type="primary",
+        use_container_width=True
+    )
+
+# Main content
+if not neighborhood:
+    st.markdown("""
+    <div style='text-align: center; margin: 50px; color: #7f8c8d;'>
+        <h4>👆 Select your neighborhood in the sidebar to see recommendations</h4>
+    </div>
+    """, unsafe_allow_html=True)
+else:
     # Get neighborhood data
     neighborhood_data = sample_neighborhoods[neighborhood]
     
-    # Simple recommendation logic
-    recommended_dog = sample_dogs[0]  # For now, always recommend first dog
+    # Neighborhood Analysis Section
+    st.header(f"📊 {neighborhood} Analysis")
     
-    return html.Div([
-        # Neighborhood stats
-        html.Div([
-            html.H3(f"📊 {neighborhood} Analysis", style={'color': '#2c3e50', 'margin-bottom': '20px'}),
-            
-            html.Div([
-                html.Div([
-                    html.H4("Safety Score", style={'margin': '0', 'color': '#7f8c8d', 'font-size': '14px'}),
-                    html.H2(f"{neighborhood_data['safety_score']}/100", 
-                           style={'margin': '5px 0', 'color': '#27ae60', 'font-size': '24px'}),
-                ], style={'background': '#ffffff', 'padding': '20px', 'border-radius': '8px', 
-                         'text-align': 'center', 'width': '23%', 'display': 'inline-block', 'margin-right': '2%'}),
-                
-                html.Div([
-                    html.H4("Walkability", style={'margin': '0', 'color': '#7f8c8d', 'font-size': '14px'}),
-                    html.H2(f"{neighborhood_data['walkability_score']}/100", 
-                           style={'margin': '5px 0', 'color': '#3498db', 'font-size': '24px'}),
-                ], style={'background': '#ffffff', 'padding': '20px', 'border-radius': '8px', 
-                         'text-align': 'center', 'width': '23%', 'display': 'inline-block', 'margin-right': '2%'}),
-                
-                html.Div([
-                    html.H4("Avg Rent", style={'margin': '0', 'color': '#7f8c8d', 'font-size': '14px'}),
-                    html.H2(f"${neighborhood_data['avg_rent']:,}", 
-                           style={'margin': '5px 0', 'color': '#9b59b6', 'font-size': '24px'}),
-                ], style={'background': '#ffffff', 'padding': '20px', 'border-radius': '8px', 
-                         'text-align': 'center', 'width': '23%', 'display': 'inline-block', 'margin-right': '2%'}),
-                
-                html.Div([
-                    html.H4("Crime Reports", style={'margin': '0', 'color': '#7f8c8d', 'font-size': '14px'}),
-                    html.H2(f"{neighborhood_data['crime_count']}", 
-                           style={'margin': '5px 0', 'color': '#e74c3c', 'font-size': '24px'}),
-                ], style={'background': '#ffffff', 'padding': '20px', 'border-radius': '8px', 
-                         'text-align': 'center', 'width': '23%', 'display': 'inline-block'})
-            ])
-        ], style={'margin-bottom': '20px'}),
+    # Display metrics in columns
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="Safety Score",
+            value=f"{neighborhood_data['safety_score']}/100",
+            delta=None
+        )
+    
+    with col2:
+        st.metric(
+            label="Walkability",
+            value=f"{neighborhood_data['walkability_score']}/100",
+            delta=None
+        )
+    
+    with col3:
+        st.metric(
+            label="Avg Rent",
+            value=f"${neighborhood_data['avg_rent']:,}",
+            delta=None
+        )
+    
+    with col4:
+        st.metric(
+            label="Crime Reports",
+            value=f"{neighborhood_data['crime_count']}",
+            delta=None
+        )
+    
+    st.divider()
+    
+    # Dog Recommendation Section
+    st.header("🐕 Your Perfect Guardian")
+    
+    # Simple recommendation logic (for now, always recommend first dog)
+    recommended_dog = sample_dogs[0]
+    
+    # Create dog recommendation card
+    with st.container():
+        col1, col2 = st.columns([2, 1])
         
-        # Dog recommendation
-        html.Div([
-            html.H3("🐕 Your Perfect Guardian", style={'color': '#2c3e50', 'margin-bottom': '20px'}),
+        with col1:
+            st.subheader(recommended_dog['name'])
+            st.write(f"**Breed:** {recommended_dog['breed']}")
+            st.write(f"**Size:** {recommended_dog['size']}")
+            st.write(f"**Protection Score:** {recommended_dog['protection_score']}/100")
+            st.write(f"**Monthly Cost:** ${recommended_dog['monthly_cost']}")
             
-            html.Div([
-                html.H2(recommended_dog['name'], style={'color': '#2c3e50', 'margin-bottom': '10px'}),
-                html.P(f"{recommended_dog['breed']} • {recommended_dog['size']}", 
-                       style={'color': '#7f8c8d', 'font-size': '16px', 'margin-bottom': '15px'}),
-                html.P(f"Protection Score: {recommended_dog['protection_score']}/100", 
-                       style={'color': '#e74c3c', 'font-weight': 'bold', 'margin-bottom': '10px'}),
-                html.P(f"Monthly Cost: ${recommended_dog['monthly_cost']}", 
-                       style={'color': '#27ae60', 'font-weight': 'bold', 'margin-bottom': '15px'}),
-                html.P("This is a perfect match for your neighborhood's safety needs!", 
-                       style={'color': '#34495e', 'line-height': '1.5'})
-            ])
-        ], style={'background': '#ffffff', 'padding': '25px', 'border-radius': '10px', 
-                 'box-shadow': '0 4px 6px rgba(0, 0, 0, 0.1)'})
-    ])
-
-# Run the server
-if __name__ == '__main__':
-    # Get port from environment variable (Render requirement)
-    port = int(os.environ.get('PORT', 8050))
+            st.success("This is a perfect match for your neighborhood's safety needs!")
+        
+        with col2:
+            # Create a simple visualization for the dog's stats
+            dog_stats = pd.DataFrame({
+                'Metric': ['Protection Score', 'Cost Efficiency'],
+                'Value': [recommended_dog['protection_score'], 100 - (recommended_dog['monthly_cost'] / 2)]
+            })
+            
+            fig = px.bar(
+                dog_stats, 
+                x='Metric', 
+                y='Value',
+                title=f"{recommended_dog['name']}'s Stats",
+                color='Value',
+                color_continuous_scale='Reds'
+            )
+            fig.update_layout(
+                height=300,
+                showlegend=False,
+                yaxis_range=[0, 100]
+            )
+            st.plotly_chart(fig, use_container_width=True)
     
-    # Run with Render settings
-    app.run_server(
-        debug=False,    # Turn off debug for production
-        host='0.0.0.0', # Required for Render
-        port=port       # Use Render's assigned port
-    )
+    # Additional visualizations
+    st.divider()
+    st.header("📈 Neighborhood Comparison")
+    
+    # Create comparison chart
+    comparison_data = []
+    for name, data in sample_neighborhoods.items():
+        comparison_data.append({
+            'Neighborhood': name,
+            'Safety Score': data['safety_score'],
+            'Walkability Score': data['walkability_score'],
+            'Crime Count': data['crime_count'],
+            'Avg Rent': data['avg_rent']
+        })
+    
+    comparison_df = pd.DataFrame(comparison_data)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig1 = px.scatter(
+            comparison_df,
+            x='Safety Score',
+            y='Walkability Score',
+            size='Crime Count',
+            color='Avg Rent',
+            hover_name='Neighborhood',
+            title='Safety vs Walkability (Bubble size = Crime Count)',
+            color_continuous_scale='Viridis'
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+    
+    with col2:
+        fig2 = px.bar(
+            comparison_df.sort_values('Safety Score'),
+            x='Neighborhood',
+            y='Safety Score',
+            title='Safety Scores by Neighborhood',
+            color='Safety Score',
+            color_continuous_scale='RdYlGn'
+        )
+        fig2.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig2, use_container_width=True)
+
+# Footer
+st.divider()
+st.markdown("""
+<div style='text-align: center; color: #7f8c8d; margin-top: 50px;'>
+    <p>🐕 SF Dog Crisis Dashboard - Helping San Francisco residents find their perfect canine guardian</p>
+    <p><em>This is a prototype version. Real data integration coming soon!</em></p>
+</div>
+""", unsafe_allow_html=True)
